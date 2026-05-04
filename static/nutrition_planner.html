@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Nutrition Planner</title>
+  <style>
+    :root {
+      --bg: #0b1120;
+      --card: rgba(15, 23, 42, 0.86);
+      --line: rgba(148, 163, 184, .24);
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --good: #22c55e;
+      --warn: #f59e0b;
+      --bad: #ef4444;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(960px 420px at -10% -10%, rgba(59,130,246,.22), transparent 55%),
+        radial-gradient(760px 330px at 110% 0%, rgba(34,197,94,.16), transparent 55%),
+        var(--bg);
+      min-height: 100vh;
+    }
+    .wrap { max-width: 1080px; margin: 0 auto; padding: 1.2rem 1rem 2rem; }
+    .topbar { display:flex; justify-content:space-between; align-items:center; gap:1rem; margin-bottom: 1rem; }
+    a.back { color: #93c5fd; text-decoration: none; font-size: .9rem; }
+    h1 { margin: 0; font-size: clamp(1.3rem, 2.8vw, 1.9rem); }
+    .grid { display:grid; grid-template-columns: 1.05fr 1fr; gap: 1rem; align-items:start; }
+    @media (max-width: 920px) { .grid { grid-template-columns: 1fr; } }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 1rem;
+      backdrop-filter: blur(6px);
+    }
+    .title { font-size: .95rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 .8rem; }
+    .row { display:grid; grid-template-columns: 1fr 1fr; gap: .7rem; margin-bottom: .7rem; }
+    @media (max-width: 640px) { .row { grid-template-columns: 1fr; } }
+    label { display:block; font-size: .82rem; color: var(--muted); margin-bottom: .28rem; }
+    input, select {
+      width: 100%;
+      border: 1px solid var(--line);
+      background: rgba(2,6,23,.48);
+      color: var(--text);
+      border-radius: 10px;
+      padding: .55rem .65rem;
+      font-size: .92rem;
+    }
+    button {
+      margin-top: .5rem;
+      border: 1px solid rgba(96,165,250,.45);
+      background: rgba(59,130,246,.2);
+      color: #dbeafe;
+      border-radius: 10px;
+      padding: .58rem .82rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:hover { background: rgba(59,130,246,.3); }
+    .metrics { display:grid; grid-template-columns: repeat(2,1fr); gap:.6rem; }
+    .metric {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: .65rem;
+      background: rgba(2,6,23,.32);
+    }
+    .metric .k { color: var(--muted); font-size: .74rem; text-transform: uppercase; letter-spacing: .07em; }
+    .metric .v { font-size: 1.15rem; font-weight: 700; margin-top: .2rem; }
+    .badge {
+      display:inline-block; margin-top:.2rem; padding:.12rem .46rem; border-radius: 999px; font-size:.72rem;
+      border: 1px solid var(--line); color: var(--muted);
+    }
+    .meal-list { margin: .6rem 0 0; padding-left: 1.1rem; line-height: 1.6; }
+    .meal-list li { margin-bottom: .18rem; }
+    .muted { color: var(--muted); }
+    .advice { margin-top: .7rem; border-top: 1px dashed var(--line); padding-top: .6rem; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <a class="back" href="/">← Home</a>
+      <span class="muted">User-friendly planner (no code output)</span>
+    </div>
+    <h1>Nutritional Planner (BMI + Body Fat Based)</h1>
+
+    <div class="grid">
+      <section class="card">
+        <h2 class="title">Profile Input</h2>
+        <div class="row">
+          <div>
+            <label>Age</label>
+            <input id="age" type="number" min="14" max="90" value="27" />
+          </div>
+          <div>
+            <label>Gender</label>
+            <select id="gender">
+              <option>male</option>
+              <option>female</option>
+              <option>other</option>
+            </select>
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label>Height (cm)</label>
+            <input id="height" type="number" min="120" max="220" value="170" />
+          </div>
+          <div>
+            <label>Weight (kg)</label>
+            <input id="weight" type="number" min="30" max="220" value="72" />
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label>Body Fat (%)</label>
+            <input id="bodyFat" type="number" min="4" max="60" value="22" />
+          </div>
+          <div>
+            <label>Goal</label>
+            <select id="goal">
+              <option value="fat_loss">fat_loss</option>
+              <option value="maintenance">maintenance</option>
+              <option value="muscle_gain">muscle_gain</option>
+            </select>
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label>Activity</label>
+            <select id="activity">
+              <option value="sedentary">sedentary</option>
+              <option value="light">light</option>
+              <option value="moderate" selected>moderate</option>
+              <option value="active">active</option>
+              <option value="very_active">very_active</option>
+            </select>
+          </div>
+          <div>
+            <label>Diet Type</label>
+            <select id="dietType">
+              <option value="non_vegetarian">non_vegetarian</option>
+              <option value="vegetarian">vegetarian</option>
+              <option value="vegan">vegan</option>
+              <option value="keto">keto</option>
+            </select>
+          </div>
+        </div>
+        <button type="button" id="planBtn">Generate My Diet Plan</button>
+      </section>
+
+      <section class="card">
+        <h2 class="title">Your Nutrition Plan</h2>
+        <div class="metrics">
+          <div class="metric"><div class="k">BMI</div><div class="v" id="bmiVal">--</div><span class="badge" id="bmiBadge">waiting</span></div>
+          <div class="metric"><div class="k">Target Calories</div><div class="v" id="calVal">--</div><span class="badge">kcal/day</span></div>
+          <div class="metric"><div class="k">Protein</div><div class="v" id="proVal">--</div><span class="badge">g/day</span></div>
+          <div class="metric"><div class="k">Carbs</div><div class="v" id="carbVal">--</div><span class="badge">g/day</span></div>
+        </div>
+        <div class="metric" style="margin-top:.6rem;"><div class="k">Fat</div><div class="v" id="fatVal">--</div><span class="badge">g/day</span></div>
+        <div class="advice">
+          <strong id="summaryTxt">Fill your details and click Generate.</strong>
+          <ul class="meal-list" id="mealList"></ul>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    const activityFactor = { sedentary:1.2, light:1.375, moderate:1.55, active:1.725, very_active:1.9 };
+
+    function bmiCategory(bmi) {
+      if (bmi < 18.5) return "underweight";
+      if (bmi < 25) return "normal";
+      if (bmi < 30) return "overweight";
+      return "obese";
+    }
+
+    function bmr(age, gender, w, h) {
+      if (gender === "male") return 10 * w + 6.25 * h - 5 * age + 5;
+      if (gender === "female") return 10 * w + 6.25 * h - 5 * age - 161;
+      return 10 * w + 6.25 * h - 5 * age - 78;
+    }
+
+    function mealSuggestions(cat, goal, dietType, bodyFat) {
+      const common = [
+        "Start day with protein + fiber breakfast.",
+        "Keep 2.5L-4L water daily based on weather/training.",
+        "Limit ultra-processed foods and sugary drinks."
+      ];
+      const byDiet = {
+        non_vegetarian: [
+          "Breakfast: eggs + oats + fruit",
+          "Lunch: chicken/fish + rice + salad",
+          "Dinner: lean protein + vegetables + light carbs"
+        ],
+        vegetarian: [
+          "Breakfast: paneer/tofu scramble + millet toast",
+          "Lunch: dal + rice + curd + salad",
+          "Dinner: paneer/chickpea bowl + vegetables"
+        ],
+        vegan: [
+          "Breakfast: oats + soy milk + chia + berries",
+          "Lunch: tofu/tempeh + quinoa + greens",
+          "Dinner: lentil curry + brown rice + salad"
+        ],
+        keto: [
+          "Breakfast: eggs + avocado + nuts",
+          "Lunch: paneer/chicken salad + olive oil",
+          "Dinner: fish/chicken + low-carb vegetables"
+        ]
+      };
+      if (cat === "underweight") common.unshift("Increase calories with quality carbs + healthy fats.");
+      if (cat === "overweight" || cat === "obese") common.unshift("Prefer 300-500 kcal deficit and prioritize satiety foods.");
+      if (goal === "muscle_gain") common.unshift("Add post-workout protein + carb meal.");
+      if (bodyFat > 30) common.unshift("Focus on high-protein, lower-sugar eating to reduce body-fat %.");
+      return [...common, ...(byDiet[dietType] || [])];
+    }
+
+    document.getElementById("planBtn").addEventListener("click", () => {
+      const age = Number(document.getElementById("age").value || 0);
+      const gender = document.getElementById("gender").value;
+      const h = Number(document.getElementById("height").value || 0);
+      const w = Number(document.getElementById("weight").value || 0);
+      const bf = Number(document.getElementById("bodyFat").value || 0);
+      const goal = document.getElementById("goal").value;
+      const activity = document.getElementById("activity").value;
+      const dietType = document.getElementById("dietType").value;
+
+      if (!age || !h || !w || !bf) return;
+
+      const bmi = w / ((h / 100) * (h / 100));
+      const category = bmiCategory(bmi);
+      const maintenance = bmr(age, gender, w, h) * (activityFactor[activity] || 1.55);
+      let target = maintenance;
+      if (goal === "fat_loss") target = maintenance * 0.82;
+      if (goal === "muscle_gain") target = maintenance * 1.12;
+
+      let protein = (goal === "muscle_gain" ? 1.9 : goal === "fat_loss" ? 1.8 : 1.6) * w;
+      if (bf > 28) protein += 10;
+      const fatRatio = goal === "muscle_gain" ? 0.28 : 0.30;
+      const fat = (target * fatRatio) / 9;
+      const carbs = Math.max((target - protein * 4 - fat * 9) / 4, 40);
+
+      document.getElementById("bmiVal").textContent = bmi.toFixed(1);
+      document.getElementById("calVal").textContent = Math.round(target);
+      document.getElementById("proVal").textContent = Math.round(protein);
+      document.getElementById("carbVal").textContent = Math.round(carbs);
+      document.getElementById("fatVal").textContent = Math.round(fat);
+
+      const badge = document.getElementById("bmiBadge");
+      badge.textContent = category;
+      badge.style.color = category === "normal" ? "var(--good)" : (category === "underweight" ? "var(--warn)" : "var(--bad)");
+
+      const summary = `BMI is ${category}. Recommended target: ${Math.round(target)} kcal/day with balanced macros.`;
+      document.getElementById("summaryTxt").textContent = summary;
+
+      const meals = mealSuggestions(category, goal, dietType, bf);
+      document.getElementById("mealList").innerHTML = meals.map((m) => `<li>${m}</li>`).join("");
+    });
+  </script>
+</body>
+</html>

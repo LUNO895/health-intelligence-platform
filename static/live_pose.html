@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Live pose — Health Intelligence</title>
+  <style>
+    :root {
+      --bg: #090f1d;
+      --panel: rgba(15, 23, 42, 0.82);
+      --border: rgba(148,163,184,.24);
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --good: #22c55e;
+      --warn: #fbbf24;
+      --bad: #f87171;
+      --blue: #60a5fa;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    header {
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(180deg, rgba(59,130,246,.12), transparent);
+    }
+    header h1 { margin: 0; font-size: 1.15rem; font-weight: 700; }
+    header p { margin: .35rem 0 0; color: var(--muted); font-size: .85rem; max-width: 70ch; }
+    .layout {
+      display: grid;
+      grid-template-columns: 1fr minmax(320px, 370px);
+      gap: 1rem;
+      padding: 1rem;
+      max-width: 1280px;
+      margin: 0 auto;
+      align-items: start;
+    }
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: 1fr; }
+    }
+    .stage {
+      position: relative;
+      background: #000;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      aspect-ratio: 4 / 3;
+      max-height: 70vh;
+      box-shadow: 0 20px 42px rgba(2, 6, 23, .42);
+    }
+    video, canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+    video { transform: scaleX(-1); }
+    canvas { transform: scaleX(-1); pointer-events: none; }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1rem 1.1rem;
+      backdrop-filter: blur(6px);
+    }
+    .panel h2 { margin: 0 0 .75rem; font-size: .95rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+    .metric { display: flex; justify-content: space-between; gap: .5rem; padding: .45rem 0; border-bottom: 1px solid var(--border); font-size: .9rem; }
+    .metric:last-child { border-bottom: 0; }
+    .hint { font-size: .85rem; color: var(--muted); line-height: 1.45; margin-top: .75rem; }
+    #status {
+      margin-top: .75rem;
+      padding: .65rem .75rem;
+      border-radius: 8px;
+      font-size: .85rem;
+      background: rgba(59,130,246,.15);
+      border: 1px solid rgba(59,130,246,.35);
+    }
+    #status.err { background: rgba(248,113,113,.12); border-color: rgba(248,113,113,.35); color: #fecaca; }
+    #status.ok { background: rgba(74,222,128,.1); border-color: rgba(74,222,128,.35); color: #bbf7d0; }
+    .toolbar { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: .75rem; }
+    button {
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.06);
+      color: var(--text);
+      padding: .45rem .75rem;
+      border-radius: 8px;
+      font-size: .85rem;
+    }
+    button:hover { background: rgba(255,255,255,.12); }
+    a.back { color: #93c5fd; font-size: .85rem; text-decoration: none; }
+    a.back:hover { text-decoration: underline; }
+    .score { font-size: 1.4rem; font-weight: 700; margin: .25rem 0 .5rem; }
+    .score-wrap { display:flex; align-items:center; gap: .65rem; margin-bottom: .3rem; }
+    .dot { width: 9px; height: 9px; border-radius: 999px; background: var(--good); box-shadow: 0 0 0 5px rgba(34,197,94,.18); }
+    .score-chip {
+      margin-left: auto;
+      padding: .18rem .5rem;
+      border-radius: 999px;
+      font-size: .75rem;
+      border: 1px solid var(--border);
+      color: var(--muted);
+    }
+    .feedback {
+      margin-top: 1rem;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: .9rem;
+      max-height: 220px;
+      overflow: auto;
+    }
+    .feedback h3 {
+      margin: 0 0 .6rem;
+      font-size: .9rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .08em;
+    }
+    .feed-item {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: .5rem .65rem;
+      align-items: start;
+      padding: .5rem 0;
+      border-bottom: 1px solid var(--border);
+      font-size: .86rem;
+    }
+    .feed-item:last-child { border-bottom: none; }
+    .feed-time { color: var(--muted); font-size: .78rem; width: 62px; }
+    .feed-msg { line-height: 1.4; }
+    .tag {
+      display:inline-block;
+      margin-right: .4rem;
+      margin-top: .25rem;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      padding: .08rem .42rem;
+      font-size: .72rem;
+      color: var(--muted);
+    }
+    .tag.warn { border-color: rgba(251,191,36,.45); color: #fde68a; }
+    .tag.good { border-color: rgba(34,197,94,.45); color: #bbf7d0; }
+    .left-col {
+      display: grid;
+      gap: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <a class="back" href="/">← Home</a>
+    <h1 style="margin-top:.5rem">Live camera pose detection</h1>
+    <p>MediaPipe Pose runs in your browser. Allow camera access. First load downloads the model (~3–8 MB). Serve this page from the API (<code>http://127.0.0.1:8000/live-pose</code>), not as a local file.</p>
+  </header>
+
+  <div class="layout">
+    <div class="left-col">
+      <div class="stage">
+        <video id="webcam" autoplay playsinline muted></video>
+        <canvas id="overlay"></canvas>
+      </div>
+      <div class="feedback">
+        <h3>Real-time Feedback Feed</h3>
+        <div id="feedList"></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="toolbar">
+        <button type="button" id="btnStart">Start camera</button>
+        <button type="button" id="btnStop">Stop</button>
+      </div>
+      <h2>Posture quality</h2>
+      <div class="score-wrap">
+        <span class="dot" id="stateDot"></span>
+        <div class="score" id="poseScore">-- / 100</div>
+        <span class="score-chip" id="qualityChip">Idle</span>
+      </div>
+      <div class="metric"><span>Detected frames</span><strong id="detFrames">0</strong></div>
+      <div class="metric"><span>Issues flagged</span><strong id="issueCount">0</strong></div>
+      <div class="metric"><span>Stable posture windows</span><strong id="stableCount">0</strong></div>
+      <h2>Joint angles (°)</h2>
+      <div class="metric"><span>Left elbow</span><strong id="angElL">—</strong></div>
+      <div class="metric"><span>Right elbow</span><strong id="angElR">—</strong></div>
+      <div class="metric"><span>Left knee</span><strong id="angKnL">—</strong></div>
+      <div class="metric"><span>Right knee</span><strong id="angKnR">—</strong></div>
+      <div class="metric"><span>Spine vs vertical</span><strong id="angSpine">—</strong></div>
+      <h2 style="margin-top:1rem">Form hint</h2>
+      <div class="score" id="hintText">—</div>
+      <div id="issueTags"></div>
+      <div id="status">Idle — press “Start camera”.</div>
+      <p class="hint">If the video area stays black, check browser permissions (lock icon in the address bar) and that no other app is using the camera.</p>
+    </div>
+  </div>
+
+  <script type="module">
+    import { PoseLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/+esm";
+
+    const POSE_CONNECTIONS = [
+      [0, 1], [1, 2], [2, 3], [3, 7], [0, 4], [4, 5], [5, 6], [6, 8], [9, 10],
+      [11, 12], [11, 13], [13, 15], [15, 17], [15, 19], [15, 21], [17, 19],
+      [12, 14], [14, 16], [16, 18], [16, 20], [16, 22], [18, 20],
+      [11, 23], [12, 24], [23, 24], [23, 25], [25, 27], [27, 29], [27, 31], [29, 31],
+      [24, 26], [26, 28], [28, 30], [28, 32], [30, 32],
+    ];
+
+    const video = document.getElementById("webcam");
+    const canvas = document.getElementById("overlay");
+    const ctx = canvas.getContext("2d");
+    const statusEl = document.getElementById("status");
+    const feedList = document.getElementById("feedList");
+    const poseScoreEl = document.getElementById("poseScore");
+    const qualityChipEl = document.getElementById("qualityChip");
+    const stateDotEl = document.getElementById("stateDot");
+    const issueTagsEl = document.getElementById("issueTags");
+
+    let framesDetected = 0;
+    let issueCount = 0;
+    let stableCount = 0;
+    let lastFeedAt = 0;
+    let lastFeedText = "";
+
+    function timeLabel() {
+      return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    }
+
+    function pushFeed(text, kind = "good") {
+      const now = Date.now();
+      if (text === lastFeedText && now - lastFeedAt < 2600) return;
+      lastFeedAt = now;
+      lastFeedText = text;
+
+      const item = document.createElement("div");
+      item.className = "feed-item";
+      item.innerHTML = `<div class="feed-time">${timeLabel()}</div><div class="feed-msg">${text}</div>`;
+      feedList.prepend(item);
+      while (feedList.children.length > 18) {
+        feedList.removeChild(feedList.lastChild);
+      }
+      if (kind === "warn") issueCount += 1;
+      if (kind === "good") stableCount += 1;
+      document.getElementById("issueCount").textContent = String(issueCount);
+      document.getElementById("stableCount").textContent = String(stableCount);
+    }
+
+    function setQuality(score) {
+      let label = "Excellent";
+      let color = "var(--good)";
+      let glow = "rgba(34,197,94,.2)";
+      if (score < 85) { label = "Good"; color = "#86efac"; }
+      if (score < 72) { label = "Needs Work"; color = "var(--warn)"; glow = "rgba(251,191,36,.25)"; }
+      if (score < 55) { label = "High Risk"; color = "var(--bad)"; glow = "rgba(248,113,113,.25)"; }
+      poseScoreEl.textContent = `${Math.round(score)} / 100`;
+      qualityChipEl.textContent = label;
+      qualityChipEl.style.color = color;
+      stateDotEl.style.background = color;
+      stateDotEl.style.boxShadow = `0 0 0 5px ${glow}`;
+    }
+
+    function setStatus(msg, cls) {
+      statusEl.className = cls || "";
+      statusEl.textContent = msg;
+    }
+
+    function angleDeg(a, b, c) {
+      const bax = a.x - b.x, bay = a.y - b.y;
+      const bcx = c.x - b.x, bcy = c.y - b.y;
+      const n1 = Math.hypot(bax, bay), n2 = Math.hypot(bcx, bcy);
+      if (n1 < 1e-6 || n2 < 1e-6) return NaN;
+      let cos = (bax * bcx + bay * bcy) / (n1 * n2);
+      cos = Math.max(-1, Math.min(1, cos));
+      return (Math.acos(cos) * 180) / Math.PI;
+    }
+
+    function verticalDevDeg(low, high) {
+      const vx = high.x - low.x, vy = high.y - low.y;
+      const n = Math.hypot(vx, vy);
+      if (n < 1e-6) return NaN;
+      const nx = vx / n, ny = vy / n;
+      const dot = Math.abs(nx * 0 + ny * -1);
+      return (Math.acos(Math.min(1, Math.max(-1, dot))) * 180) / Math.PI;
+    }
+
+    function resizeCanvas() {
+      const rect = canvas.parentElement.getBoundingClientRect();
+      const w = Math.max(1, Math.floor(rect.width));
+      const h = Math.max(1, Math.floor(rect.height));
+      if (canvas.width !== w || canvas.height !== h) {
+        canvas.width = w;
+        canvas.height = h;
+      }
+    }
+    window.addEventListener("resize", resizeCanvas);
+    resizeCanvas();
+
+    let poseLandmarker = null;
+    let running = false;
+    let lastTime = -1;
+
+    async function loadModel() {
+      setStatus("Loading MediaPipe model (first visit may take 10–30s)…");
+      const wasm = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm";
+      const vision = await FilesetResolver.forVisionTasks(wasm);
+      const modelUrl =
+        "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task";
+      poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
+        baseOptions: { modelAssetPath: modelUrl, delegate: "CPU" },
+        runningMode: "VIDEO",
+        numPoses: 1,
+        minPoseDetectionConfidence: 0.5,
+        minPosePresenceConfidence: 0.5,
+        minTrackingConfidence: 0.5,
+      });
+      setStatus("Model ready. Starting camera…", "ok");
+    }
+
+    function drawLandmarks(lm, w, h) {
+      ctx.clearRect(0, 0, w, h);
+      if (!lm || lm.length === 0) {
+        ["angElL", "angElR", "angKnL", "angKnR", "angSpine"].forEach((id) => {
+          document.getElementById(id).textContent = "—";
+        });
+        document.getElementById("hintText").textContent = "No pose detected — step back so full body is visible.";
+        document.getElementById("hintText").style.color = "var(--muted)";
+        issueTagsEl.innerHTML = `<span class="tag">No landmarks</span>`;
+        setQuality(35);
+        pushFeed("No pose detected. Move back and keep full body in frame.", "warn");
+        return;
+      }
+      framesDetected += 1;
+      document.getElementById("detFrames").textContent = String(framesDetected);
+      const pts = lm.map((p) => ({ x: p.x * w, y: p.y * h, z: p.z }));
+
+      ctx.strokeStyle = "rgba(56, 189, 248, 0.85)";
+      ctx.lineWidth = 3;
+      for (const [a, b] of POSE_CONNECTIONS) {
+        const pa = pts[a], pb = pts[b];
+        if (!pa || !pb) continue;
+        ctx.beginPath();
+        ctx.moveTo(pa.x, pa.y);
+        ctx.lineTo(pb.x, pb.y);
+        ctx.stroke();
+      }
+      ctx.fillStyle = "rgba(251, 191, 36, 0.95)";
+      for (const p of pts) {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      const p = (i) => pts[i];
+      const elL = angleDeg(p(13), p(11), p(15));
+      const elR = angleDeg(p(14), p(12), p(16));
+      const knL = angleDeg(p(25), p(23), p(27));
+      const knR = angleDeg(p(26), p(24), p(28));
+      const midS = { x: (p(11).x + p(12).x) / 2, y: (p(11).y + p(12).y) / 2 };
+      const midH = { x: (p(23).x + p(24).x) / 2, y: (p(23).y + p(24).y) / 2 };
+      const spine = verticalDevDeg(midH, midS);
+
+      const fmt = (v) => (Number.isFinite(v) ? v.toFixed(0) : "—");
+      document.getElementById("angElL").textContent = fmt(elL);
+      document.getElementById("angElR").textContent = fmt(elR);
+      document.getElementById("angKnL").textContent = fmt(knL);
+      document.getElementById("angKnR").textContent = fmt(knR);
+      document.getElementById("angSpine").textContent = fmt(spine);
+
+      const issues = [];
+      if (Number.isFinite(knL) && Number.isFinite(knR) && Math.abs(knL - knR) > 18) {
+        issues.push("Knee angle asymmetry");
+      }
+      if (Number.isFinite(spine) && spine > 18) {
+        issues.push("Spine not neutral");
+      }
+      if (Number.isFinite(p(11).y) && Number.isFinite(p(12).y) && Math.abs(p(11).y - p(12).y) > 0.04) {
+        issues.push("Shoulder imbalance");
+      }
+
+      let hint = "Tracking OK — stable posture window detected.";
+      let scoreClass = "ok";
+      let score = 96;
+      score -= issues.length * 15;
+      if (Number.isFinite(spine)) score -= Math.max(0, spine - 8) * 0.8;
+      if (Number.isFinite(knL) && Number.isFinite(knR)) score -= Math.max(0, Math.abs(knL - knR) - 8) * 0.7;
+      score = Math.max(0, Math.min(100, score));
+
+      if (Number.isFinite(knL) && Number.isFinite(knR) && Math.abs(knL - knR) > 18) {
+        hint = "Knee angles differ — check alignment / weight shift.";
+        scoreClass = "warn";
+      }
+      if (Number.isFinite(spine) && spine > 18) {
+        hint = "Torso deviates from neutral — brace core, stack shoulders over hips.";
+        scoreClass = "warn";
+      }
+      if (Number.isFinite(p(11).y) && Number.isFinite(p(12).y) && Math.abs(p(11).y - p(12).y) > 0.04) {
+        hint = "Shoulders look uneven — level the upper body.";
+        scoreClass = "warn";
+      }
+      document.getElementById("hintText").textContent = hint;
+      document.getElementById("hintText").style.color =
+        scoreClass === "warn" ? "var(--warn)" : "var(--good)";
+
+      if (issues.length) {
+        issueTagsEl.innerHTML = issues.map((it) => `<span class="tag warn">${it}</span>`).join("");
+        pushFeed(`${issues.join(", ")}. ${hint}`, "warn");
+      } else {
+        issueTagsEl.innerHTML = `<span class="tag good">Balanced</span><span class="tag good">Good alignment</span>`;
+        pushFeed("Good posture segment. Keep breathing and steady movement.", "good");
+      }
+      setQuality(score);
+    }
+
+    async function startCam() {
+      try {
+        if (!poseLandmarker) await loadModel();
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } },
+          audio: false,
+        });
+        video.srcObject = stream;
+        await video.play();
+        running = true;
+        lastTime = -1;
+        framesDetected = 0;
+        issueCount = 0;
+        stableCount = 0;
+        document.getElementById("detFrames").textContent = "0";
+        document.getElementById("issueCount").textContent = "0";
+        document.getElementById("stableCount").textContent = "0";
+        feedList.innerHTML = "";
+        pushFeed("Camera started. Begin your movement slowly for baseline capture.", "good");
+        setStatus("Live — pose estimation running.", "ok");
+        requestAnimationFrame(loop);
+      } catch (e) {
+        console.error(e);
+        setStatus("Camera or model error: " + (e && e.message ? e.message : String(e)), "err");
+      }
+    }
+
+    function stopCam() {
+      running = false;
+      lastTime = -1;
+      const s = video.srcObject;
+      if (s && s.getTracks) s.getTracks().forEach((t) => t.stop());
+      video.srcObject = null;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      issueTagsEl.innerHTML = "";
+      poseScoreEl.textContent = "-- / 100";
+      qualityChipEl.textContent = "Stopped";
+      qualityChipEl.style.color = "var(--muted)";
+      stateDotEl.style.background = "var(--muted)";
+      setStatus("Stopped.", "");
+    }
+
+    function loop() {
+      if (!running || !poseLandmarker) {
+        requestAnimationFrame(loop);
+        return;
+      }
+      resizeCanvas();
+      const vw = video.videoWidth;
+      const vh = video.videoHeight;
+      const cw = canvas.width;
+      const ch = canvas.height;
+      if (vw && vh && cw && ch) {
+        const now = performance.now();
+        if (video.currentTime !== lastTime) {
+          lastTime = video.currentTime;
+          const res = poseLandmarker.detectForVideo(video, now);
+          const lm = res.landmarks && res.landmarks[0];
+          drawLandmarks(lm, cw, ch);
+        }
+      }
+      requestAnimationFrame(loop);
+    }
+
+    document.getElementById("btnStart").addEventListener("click", startCam);
+    document.getElementById("btnStop").addEventListener("click", stopCam);
+  </script>
+</body>
+</html>

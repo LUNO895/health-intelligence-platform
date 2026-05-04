@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Health Intelligence — Home</title>
+  <style>
+    :root {
+      --bg: #0b1120;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --card: rgba(15, 23, 42, 0.82);
+      --line: rgba(148, 163, 184, 0.22);
+      --blue: #60a5fa;
+      --green: #4ade80;
+      --amber: #fbbf24;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+      background:
+        radial-gradient(920px 420px at -10% -10%, rgba(59,130,246,.22), transparent 50%),
+        radial-gradient(780px 360px at 110% 10%, rgba(34,197,94,.18), transparent 50%),
+        var(--bg);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+    }
+    .wrap { max-width: 1080px; margin: 0 auto; padding: 2.2rem 1rem 2.7rem; }
+    .title { margin: 0 0 0.4rem; font-size: clamp(1.4rem, 3.5vw, 2rem); letter-spacing: -0.02em; }
+    .lead { margin: 0 0 1.3rem; color: var(--muted); max-width: 72ch; line-height: 1.6; }
+    .layout {
+      display: grid;
+      grid-template-columns: 1.25fr 1fr;
+      gap: 1rem;
+      align-items: start;
+    }
+    @media (max-width: 920px) { .layout { grid-template-columns: 1fr; } }
+    .panel {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 1rem;
+      backdrop-filter: blur(6px);
+    }
+    .quick-links { display: grid; gap: 0.8rem; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+    a.card {
+      text-decoration: none;
+      color: inherit;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 0.95rem;
+      background: linear-gradient(160deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
+      transition: transform .12s ease, border-color .12s ease, box-shadow .12s ease;
+      display: block;
+    }
+    a.card:hover { transform: translateY(-2px); border-color: rgba(96,165,250,.55); box-shadow: 0 14px 28px rgba(2,6,23,.4); }
+    .badge { display:inline-block; font-size: .68rem; font-weight:700; text-transform: uppercase; letter-spacing:.08em; border-radius: 999px; padding:.2rem .5rem; margin-bottom:.42rem; }
+    .b1 { background: rgba(96,165,250,.2); color:#bfdbfe; }
+    .b2 { background: rgba(74,222,128,.2); color:#bbf7d0; }
+    .b3 { background: rgba(251,191,36,.18); color:#fde68a; }
+    h2, h3 { margin: 0; }
+    .card h3 { font-size: 1.04rem; margin-bottom: 0.33rem; }
+    .card p { margin: 0; color: var(--muted); font-size: .91rem; line-height: 1.45; }
+    .panel h2 { font-size: 1.02rem; margin-bottom: 0.7rem; }
+    .streak-top { display:flex; justify-content:space-between; align-items:center; gap: .8rem; margin-bottom:0.6rem; }
+    .streak-count { color: #bbf7d0; font-weight: 700; font-size: 1.05rem; }
+    .muted { color: var(--muted); font-size: .87rem; }
+    .calendar {
+      margin-top: 0.6rem;
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 0.38rem;
+    }
+    .day-label {
+      color: var(--muted);
+      font-size: .73rem;
+      text-align: center;
+      padding: 0.18rem 0;
+    }
+    .cell {
+      aspect-ratio: 1/1;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: rgba(51,65,85,.25);
+      position: relative;
+    }
+    .cell.active { background: rgba(34,197,94,.35); border-color: rgba(34,197,94,.6); }
+    .cell.today::after {
+      content: "";
+      position: absolute;
+      inset: 2px;
+      border: 1px dashed rgba(96,165,250,.9);
+      border-radius: 6px;
+    }
+    .btn-row { display:flex; gap:.5rem; margin-top:.8rem; flex-wrap: wrap; }
+    button {
+      border: 1px solid var(--line);
+      background: rgba(148,163,184,.12);
+      color: var(--text);
+      border-radius: 9px;
+      padding: .42rem .65rem;
+      cursor: pointer;
+      font-size: .83rem;
+    }
+    button:hover { background: rgba(148,163,184,.2); }
+    code { background: rgba(15,23,42,.9); padding: .1rem .32rem; border-radius: 6px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1 class="title">Health Intelligence Platform</h1>
+    <p class="lead">
+      A cleaner, user-friendly home with quick actions and a daily streak tracker.
+      Run API first: <code>uvicorn api.main:app --reload --host 127.0.0.1 --port 8000</code>.
+    </p>
+
+    <div class="layout">
+      <section class="panel">
+        <h2>Quick Actions</h2>
+        <div class="quick-links">
+          <a class="card" href="/live-pose">
+            <span class="badge b1">Module 1</span>
+            <h3>Live Camera Pose</h3>
+            <p>Real-time posture tracking with instant feedback feed and joint-angle analysis.</p>
+          </a>
+          <a class="card" href="/nutrition-planner">
+            <span class="badge b2">Nutrition Planner</span>
+            <h3>BMI Based Diet Plan</h3>
+            <p>Enter height, weight, body-fat %, and goal. Get a user-friendly daily meal direction.</p>
+          </a>
+          <a class="card" href="/daily-progress">
+            <span class="badge b3">Daily Progress</span>
+            <h3>Checklist + Exercise Tracker</h3>
+            <p>Track water, 15K steps, pushups, todo list, and live pushup/pullup form check.</p>
+          </a>
+        </div>
+        <p class="muted" style="margin-top:.9rem;">
+          Do not open HTML as <code>file://</code>; use <code>http://127.0.0.1:8000/</code>.
+        </p>
+      </section>
+
+      <section class="panel">
+        <div class="streak-top">
+          <h2>Daily Streak Calendar</h2>
+          <span id="streakCount" class="streak-count">0 day streak</span>
+        </div>
+        <p class="muted">Click “Mark Today Done” after completing posture or nutrition check-in.</p>
+        <div class="calendar" id="calendar"></div>
+        <div class="btn-row">
+          <button id="markTodayBtn" type="button">Mark Today Done</button>
+          <button id="clearTodayBtn" type="button">Undo Today</button>
+          <button id="resetBtn" type="button">Reset Calendar</button>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    const STORAGE_KEY = "hip_streak_dates_v1";
+    const calendarEl = document.getElementById("calendar");
+    const streakEl = document.getElementById("streakCount");
+
+    function todayKey() {
+      const d = new Date();
+      return d.toISOString().slice(0, 10);
+    }
+
+    function loadDates() {
+      try {
+        return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+      } catch {
+        return [];
+      }
+    }
+
+    function saveDates(dates) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(new Set(dates)).sort()));
+    }
+
+    function calcStreak(set) {
+      let streak = 0;
+      const d = new Date();
+      d.setHours(0, 0, 0, 0);
+      while (true) {
+        const key = d.toISOString().slice(0, 10);
+        if (!set.has(key)) break;
+        streak += 1;
+        d.setDate(d.getDate() - 1);
+      }
+      return streak;
+    }
+
+    function renderCalendar() {
+      const dates = loadDates();
+      const marked = new Set(dates);
+      const now = new Date();
+      const y = now.getFullYear();
+      const m = now.getMonth();
+      const first = new Date(y, m, 1);
+      const last = new Date(y, m + 1, 0);
+      const startOffset = (first.getDay() + 6) % 7;
+
+      calendarEl.innerHTML = "";
+      ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].forEach((d) => {
+        const label = document.createElement("div");
+        label.className = "day-label";
+        label.textContent = d;
+        calendarEl.appendChild(label);
+      });
+
+      for (let i = 0; i < startOffset; i += 1) {
+        const b = document.createElement("div");
+        b.className = "cell";
+        b.style.opacity = "0.2";
+        calendarEl.appendChild(b);
+      }
+
+      for (let day = 1; day <= last.getDate(); day += 1) {
+        const d = new Date(y, m, day);
+        const key = d.toISOString().slice(0, 10);
+        const cell = document.createElement("div");
+        cell.className = "cell";
+        if (marked.has(key)) cell.classList.add("active");
+        if (key === todayKey()) cell.classList.add("today");
+        cell.title = key + (marked.has(key) ? " ✓" : "");
+        calendarEl.appendChild(cell);
+      }
+
+      const streak = calcStreak(marked);
+      streakEl.textContent = streak + (streak === 1 ? " day streak" : " day streak");
+    }
+
+    document.getElementById("markTodayBtn").addEventListener("click", () => {
+      const d = loadDates();
+      d.push(todayKey());
+      saveDates(d);
+      renderCalendar();
+    });
+    document.getElementById("clearTodayBtn").addEventListener("click", () => {
+      const t = todayKey();
+      saveDates(loadDates().filter((x) => x !== t));
+      renderCalendar();
+    });
+    document.getElementById("resetBtn").addEventListener("click", () => {
+      localStorage.removeItem(STORAGE_KEY);
+      renderCalendar();
+    });
+    renderCalendar();
+  </script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+{
+  "age": 30,
+  "gender": "female",
+  "height_cm": 165,
+  "weight_kg": 62,
+  "activity_level": "moderate",
+  "fitness_goal": "fat_loss",
+  "diet_preference": "vegetarian",
+  "allergies": ["peanuts"],
+  "medical_notes": "Example only — not medical advice."
+}

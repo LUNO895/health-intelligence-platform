@@ -1,0 +1,15 @@
+.DS_Store
+.env
+.venv/
+__pycache__/
+*.pyc
+
+# runtime outputs
+output/
+data/
+
+# local tooling
+.pytest_cache/
+.mypy_cache/
+.idea/
+.vscode/

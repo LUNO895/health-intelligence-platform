@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Daily Progress</title>
+  <style>
+    :root {
+      --bg: #0b1120;
+      --card: rgba(15, 23, 42, 0.86);
+      --line: rgba(148,163,184,.25);
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --green: #22c55e;
+      --amber: #f59e0b;
+      --red: #ef4444;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      background:
+        radial-gradient(980px 420px at -10% -10%, rgba(59,130,246,.22), transparent 55%),
+        radial-gradient(760px 340px at 110% 0%, rgba(34,197,94,.16), transparent 50%),
+        var(--bg);
+      min-height: 100vh;
+    }
+    .wrap { max-width: 1260px; margin: 0 auto; padding: 1rem; }
+    .top { display:flex; justify-content:space-between; align-items:center; margin-bottom: .8rem; }
+    a.back { color:#93c5fd; text-decoration:none; }
+    h1 { margin:.2rem 0 0; font-size: clamp(1.25rem, 2.7vw, 1.75rem); }
+    .layout { display:grid; grid-template-columns: 340px 1fr; gap:1rem; }
+    @media (max-width: 980px) { .layout { grid-template-columns: 1fr; } }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: .95rem;
+      backdrop-filter: blur(6px);
+    }
+    .section-title {
+      margin: 0 0 .75rem;
+      font-size: .9rem;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--muted);
+    }
+    .check-row { display:flex; align-items:center; justify-content:space-between; gap:.5rem; padding:.45rem 0; border-bottom:1px solid var(--line); }
+    .check-row:last-child { border-bottom: none; }
+    .pill {
+      display:inline-block; border:1px solid var(--line); border-radius:999px; padding:.12rem .45rem; font-size:.72rem; color:var(--muted);
+    }
+    input[type="checkbox"] { width: 18px; height: 18px; accent-color: #22c55e; }
+    .calendar { display:grid; grid-template-columns: repeat(7, 1fr); gap:.35rem; margin-top:.6rem; }
+    .day-label { font-size:.72rem; text-align:center; color:var(--muted); }
+    .cell {
+      aspect-ratio:1/1;
+      border-radius:8px;
+      border:1px solid var(--line);
+      background: rgba(51,65,85,.26);
+      position: relative;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size: .75rem;
+      color: #bbf7d0;
+    }
+    .cell.active { background: rgba(34,197,94,.34); border-color: rgba(34,197,94,.6); }
+    .cell.active::after { content: "✓"; font-weight: 800; }
+    .cell.today::before {
+      content:"";
+      position:absolute;
+      inset:2px;
+      border:1px dashed rgba(96,165,250,.88);
+      border-radius:6px;
+    }
+    .row { display:grid; grid-template-columns: 1fr 1fr; gap:1rem; }
+    @media (max-width: 780px) { .row { grid-template-columns: 1fr; } }
+    .stage {
+      position:relative;
+      background:#000;
+      border-radius:12px;
+      overflow:hidden;
+      border:1px solid var(--line);
+      aspect-ratio:4/3;
+    }
+    video, canvas { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; }
+    video { transform: scaleX(-1); }
+    canvas { transform: scaleX(-1); pointer-events:none; }
+    .toolbar { display:flex; gap:.5rem; flex-wrap:wrap; margin-bottom:.65rem; }
+    button {
+      border:1px solid var(--line);
+      background: rgba(148,163,184,.12);
+      color: var(--text);
+      border-radius:9px;
+      padding:.42rem .65rem;
+      cursor:pointer;
+      font-size:.84rem;
+    }
+    .metrics { margin-top:.65rem; display:grid; grid-template-columns: repeat(3, 1fr); gap:.55rem; }
+    .metric { border:1px solid var(--line); border-radius:10px; padding:.5rem; background: rgba(2,6,23,.36); }
+    .metric .k { color:var(--muted); font-size:.72rem; text-transform:uppercase; letter-spacing:.08em; }
+    .metric .v { margin-top:.15rem; font-weight:700; font-size:1.05rem; }
+    .feed { margin-top:.7rem; max-height: 150px; overflow:auto; border-top:1px dashed var(--line); padding-top:.5rem; }
+    .feed-item { display:grid; grid-template-columns:64px 1fr; gap:.6rem; font-size:.84rem; padding:.34rem 0; border-bottom:1px solid var(--line); }
+    .feed-item:last-child { border-bottom:none; }
+    .time { color:var(--muted); font-size:.75rem; }
+    .status { margin-top:.55rem; font-size:.85rem; color:var(--muted); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <a class="back" href="/">← Home</a>
+      <span class="pill">Daily Progress Tab</span>
+    </div>
+    <h1>Daily Progress + Exercise Check</h1>
+
+    <div class="layout">
+      <aside class="card">
+        <h2 class="section-title">Daily Checklist</h2>
+        <div class="check-row"><span>Water intake 3L+</span><input id="taskWater" type="checkbox" /></div>
+        <div class="check-row"><span>15K steps</span><input id="taskSteps" type="checkbox" /></div>
+        <div class="check-row"><span>Push-up routine</span><input id="taskPushups" type="checkbox" /></div>
+        <div class="check-row"><span>Pull-up routine</span><input id="taskPullups" type="checkbox" /></div>
+        <div class="check-row"><span>Mobility / stretch</span><input id="taskMobility" type="checkbox" /></div>
+        <div class="check-row"><span>Sleep target hit</span><input id="taskSleep" type="checkbox" /></div>
+        <div class="check-row"><span>To-do completed</span><input id="taskTodo" type="checkbox" /></div>
+        <div style="margin-top:.6rem;">
+          <button id="markDoneBtn" type="button">Mark Today Completed</button>
+        </div>
+
+        <h2 class="section-title" style="margin-top:1rem;">Streak Calendar</h2>
+        <div class="calendar" id="calendar"></div>
+      </aside>
+
+      <section class="card">
+        <h2 class="section-title">Live Exercise Camera (Pushups / Pullups)</h2>
+        <div class="toolbar">
+          <button id="startCamBtn" type="button">Start Camera</button>
+          <button id="stopCamBtn" type="button">Stop</button>
+          <button id="modePushBtn" type="button">Mode: Pushup</button>
+          <button id="modePullBtn" type="button">Mode: Pullup</button>
+        </div>
+
+        <div class="row">
+          <div>
+            <div class="stage">
+              <video id="cam" autoplay playsinline muted></video>
+              <canvas id="overlay"></canvas>
+            </div>
+          </div>
+          <div>
+            <div class="metrics">
+              <div class="metric"><div class="k">Exercise</div><div class="v" id="curMode">Pushup</div></div>
+              <div class="metric"><div class="k">Rep Count</div><div class="v" id="repCount">0</div></div>
+              <div class="metric"><div class="k">Form Score</div><div class="v" id="formScore">--</div></div>
+            </div>
+            <div class="metrics" style="margin-top:.5rem;">
+              <div class="metric"><div class="k">Elbow</div><div class="v" id="elbowVal">--</div></div>
+              <div class="metric"><div class="k">Shoulder Level</div><div class="v" id="shoulderVal">--</div></div>
+              <div class="metric"><div class="k">Torso</div><div class="v" id="torsoVal">--</div></div>
+            </div>
+            <div class="status" id="status">Idle</div>
+            <div class="feed" id="feed"></div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script type="module">
+    import { PoseLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/+esm";
+    const STORE = "hip_daily_progress_v2";
+    const video = document.getElementById("cam");
+    const canvas = document.getElementById("overlay");
+    const ctx = canvas.getContext("2d");
+    const feed = document.getElementById("feed");
+
+    const CHECKS = ["taskWater","taskSteps","taskPushups","taskPullups","taskMobility","taskSleep","taskTodo"];
+    let mode = "pushup";
+    let pose = null;
+    let running = false;
+    let lastTime = -1;
+    let stage = "up";
+    let reps = 0;
+    let lastFeed = "";
+    let formScore = 90;
+
+    const POSE_CONNECTIONS = [[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],[23,24],[23,25],[25,27],[24,26],[26,28]];
+    const p = (pts, i) => pts[i];
+    const today = () => new Date().toISOString().slice(0,10);
+
+    function loadState() {
+      try { return JSON.parse(localStorage.getItem(STORE) || "{}"); } catch { return {}; }
+    }
+    function saveState(v) { localStorage.setItem(STORE, JSON.stringify(v)); }
+
+    function angle(a,b,c){
+      const bax = a.x - b.x, bay = a.y - b.y;
+      const bcx = c.x - b.x, bcy = c.y - b.y;
+      const n1 = Math.hypot(bax,bay), n2 = Math.hypot(bcx,bcy);
+      if (n1 < 1e-6 || n2 < 1e-6) return NaN;
+      let cos = (bax*bcx + bay*bcy)/(n1*n2);
+      cos = Math.max(-1, Math.min(1, cos));
+      return Math.acos(cos) * 180 / Math.PI;
+    }
+
+    function pushFeed(msg) {
+      if (msg === lastFeed) return;
+      lastFeed = msg;
+      const t = new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit", second:"2-digit"});
+      const el = document.createElement("div");
+      el.className = "feed-item";
+      el.innerHTML = `<div class="time">${t}</div><div>${msg}</div>`;
+      feed.prepend(el);
+      while (feed.children.length > 14) feed.removeChild(feed.lastChild);
+    }
+
+    function resizeCanvas() {
+      const rect = canvas.parentElement.getBoundingClientRect();
+      const w = Math.max(1, Math.floor(rect.width));
+      const h = Math.max(1, Math.floor(rect.height));
+      if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    }
+    window.addEventListener("resize", resizeCanvas);
+    resizeCanvas();
+
+    function draw(landmarks) {
+      const w = canvas.width, h = canvas.height;
+      ctx.clearRect(0,0,w,h);
+      if (!landmarks || !landmarks.length) return null;
+      const pts = landmarks.map((k) => ({ x: k.x * w, y: k.y * h, z: k.z }));
+      ctx.strokeStyle = "rgba(96,165,250,.85)";
+      ctx.lineWidth = 3;
+      for (const [a,b] of POSE_CONNECTIONS) {
+        const pa = pts[a], pb = pts[b];
+        if (!pa || !pb) continue;
+        ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y); ctx.stroke();
+      }
+      ctx.fillStyle = "rgba(251,191,36,.95)";
+      for (const point of pts) { ctx.beginPath(); ctx.arc(point.x,point.y,4,0,Math.PI*2); ctx.fill(); }
+      return pts;
+    }
+
+    function qualityUpdate(pts) {
+      if (!pts) {
+        document.getElementById("status").textContent = "No pose detected. Keep full body visible.";
+        pushFeed("No pose detected. Move camera to include full upper body.");
+        return;
+      }
+      const elR = angle(p(pts,14), p(pts,12), p(pts,16));
+      const elL = angle(p(pts,13), p(pts,11), p(pts,15));
+      const elbow = Number.isFinite(elR) && Number.isFinite(elL) ? (elR + elL) / 2 : NaN;
+      const shDiff = Math.abs(p(pts,11).y - p(pts,12).y) * 100;
+      const torso = Math.abs(((p(pts,11).x + p(pts,12).x) / 2) - ((p(pts,23).x + p(pts,24).x) / 2)) * 100;
+
+      document.getElementById("elbowVal").textContent = Number.isFinite(elbow) ? elbow.toFixed(0) + "°" : "--";
+      document.getElementById("shoulderVal").textContent = shDiff.toFixed(1);
+      document.getElementById("torsoVal").textContent = torso.toFixed(1);
+
+      let issues = 0;
+      if (shDiff > 2.5) issues += 1;
+      if (torso > 5.5) issues += 1;
+      if (Number.isFinite(elbow) && (elbow < 60 || elbow > 170)) issues += 1;
+      formScore = Math.max(40, 96 - issues * 16 - Math.max(0, shDiff - 1.5) * 1.7);
+      document.getElementById("formScore").textContent = Math.round(formScore);
+
+      if (mode === "pushup" && Number.isFinite(elbow)) {
+        if (stage === "up" && elbow < 95) {
+          stage = "down";
+          pushFeed("Good depth reached. Drive up with stable core.");
+        } else if (stage === "down" && elbow > 150) {
+          stage = "up";
+          reps += 1;
+          document.getElementById("repCount").textContent = String(reps);
+          pushFeed(`Pushup rep ${reps} counted.`);
+        }
+      }
+      if (mode === "pullup" && Number.isFinite(elbow)) {
+        if (stage === "down" && elbow < 90) {
+          stage = "up";
+          pushFeed("Pull phase reached. Keep shoulders depressed.");
+        } else if (stage === "up" && elbow > 145) {
+          stage = "down";
+          reps += 1;
+          document.getElementById("repCount").textContent = String(reps);
+          pushFeed(`Pullup rep ${reps} counted.`);
+        }
+      }
+
+      const msg = formScore >= 85
+        ? "Form looks good. Continue controlled movement."
+        : formScore >= 70
+          ? "Fair form. Keep shoulders level and core tight."
+          : "Form needs correction. Slow down and align body.";
+      document.getElementById("status").textContent = msg;
+    }
+
+    async function loadModel() {
+      const wasm = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm";
+      const vision = await FilesetResolver.forVisionTasks(wasm);
+      pose = await PoseLandmarker.createFromOptions(vision, {
+        baseOptions: {
+          modelAssetPath: "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task",
+          delegate: "CPU"
+        },
+        runningMode: "VIDEO",
+        numPoses: 1,
+        minPoseDetectionConfidence: 0.5,
+        minPosePresenceConfidence: 0.5,
+        minTrackingConfidence: 0.5
+      });
+    }
+
+    async function startCam() {
+      try {
+        if (!pose) await loadModel();
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        video.srcObject = stream;
+        await video.play();
+        running = true;
+        reps = 0;
+        stage = mode === "pushup" ? "up" : "down";
+        document.getElementById("repCount").textContent = "0";
+        pushFeed("Camera started. " + (mode === "pushup" ? "Pushup mode active." : "Pullup mode active."));
+        requestAnimationFrame(loop);
+      } catch (err) {
+        document.getElementById("status").textContent = "Camera/model error: " + (err?.message || String(err));
+      }
+    }
+
+    function stopCam() {
+      running = false;
+      const s = video.srcObject;
+      if (s && s.getTracks) s.getTracks().forEach((t) => t.stop());
+      video.srcObject = null;
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      document.getElementById("status").textContent = "Stopped.";
+    }
+
+    function loop() {
+      if (!running || !pose) return;
+      resizeCanvas();
+      if (video.videoWidth && video.videoHeight) {
+        const now = performance.now();
+        if (video.currentTime !== lastTime) {
+          lastTime = video.currentTime;
+          const res = pose.detectForVideo(video, now);
+          const lm = res.landmarks && res.landmarks[0];
+          const pts = draw(lm);
+          qualityUpdate(pts);
+        }
+      }
+      requestAnimationFrame(loop);
+    }
+
+    function renderCalendar() {
+      const state = loadState();
+      const done = new Set(state.doneDays || []);
+      const cal = document.getElementById("calendar");
+      cal.innerHTML = "";
+      ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].forEach((d) => {
+        const label = document.createElement("div");
+        label.className = "day-label";
+        label.textContent = d;
+        cal.appendChild(label);
+      });
+      const now = new Date();
+      const y = now.getFullYear(), m = now.getMonth();
+      const first = new Date(y,m,1), last = new Date(y,m+1,0);
+      const offset = (first.getDay()+6)%7;
+      for (let i=0;i<offset;i+=1) {
+        const blank = document.createElement("div");
+        blank.className = "cell";
+        blank.style.opacity = "0.25";
+        cal.appendChild(blank);
+      }
+      for (let d=1; d<=last.getDate(); d+=1) {
+        const dt = new Date(y,m,d);
+        const key = dt.toISOString().slice(0,10);
+        const cell = document.createElement("div");
+        cell.className = "cell";
+        if (done.has(key)) cell.classList.add("active");
+        if (key === today()) cell.classList.add("today");
+        cal.appendChild(cell);
+      }
+    }
+
+    function loadChecklist() {
+      const st = loadState();
+      const tasks = st.tasks || {};
+      CHECKS.forEach((id) => {
+        document.getElementById(id).checked = Boolean(tasks[today()] && tasks[today()][id]);
+      });
+    }
+
+    function saveChecklist() {
+      const st = loadState();
+      st.tasks = st.tasks || {};
+      st.tasks[today()] = st.tasks[today()] || {};
+      CHECKS.forEach((id) => { st.tasks[today()][id] = document.getElementById(id).checked; });
+      saveState(st);
+    }
+
+    CHECKS.forEach((id) => document.getElementById(id).addEventListener("change", saveChecklist));
+    document.getElementById("markDoneBtn").addEventListener("click", () => {
+      saveChecklist();
+      const st = loadState();
+      st.doneDays = st.doneDays || [];
+      if (!st.doneDays.includes(today())) st.doneDays.push(today());
+      saveState(st);
+      renderCalendar();
+    });
+    document.getElementById("startCamBtn").addEventListener("click", startCam);
+    document.getElementById("stopCamBtn").addEventListener("click", stopCam);
+    document.getElementById("modePushBtn").addEventListener("click", () => {
+      mode = "pushup";
+      stage = "up";
+      reps = 0;
+      document.getElementById("curMode").textContent = "Pushup";
+      document.getElementById("repCount").textContent = "0";
+      pushFeed("Switched to pushup mode.");
+    });
+    document.getElementById("modePullBtn").addEventListener("click", () => {
+      mode = "pullup";
+      stage = "down";
+      reps = 0;
+      document.getElementById("curMode").textContent = "Pullup";
+      document.getElementById("repCount").textContent = "0";
+      pushFeed("Switched to pullup mode.");
+    });
+
+    renderCalendar();
+    loadChecklist();
+  </script>
+</body>
+</html>
