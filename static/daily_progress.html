@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Daily Progress</title>
+  <link rel="stylesheet" href="/static/app.css" />
   <style>
     :root {
       --bg: #0b1120;
@@ -112,7 +113,6 @@
 <body>
   <div class="wrap">
     <div class="top">
-      <a class="back" href="/">← Home</a>
       <span class="pill">Daily Progress Tab</span>
     </div>
     <h1>Daily Progress + Exercise Check</h1>
@@ -142,6 +142,7 @@
           <button id="stopCamBtn" type="button">Stop</button>
           <button id="modePushBtn" type="button">Mode: Pushup</button>
           <button id="modePullBtn" type="button">Mode: Pullup</button>
+          <button id="modeSquatBtn" type="button">Mode: Squat</button>
         </div>
 
         <div class="row">
@@ -162,6 +163,11 @@
               <div class="metric"><div class="k">Shoulder Level</div><div class="v" id="shoulderVal">--</div></div>
               <div class="metric"><div class="k">Torso</div><div class="v" id="torsoVal">--</div></div>
             </div>
+            <div class="metrics" style="margin-top:.5rem;">
+              <div class="metric"><div class="k">Knee</div><div class="v" id="kneeVal">--</div></div>
+              <div class="metric"><div class="k">Accuracy</div><div class="v" id="accVal">--%</div></div>
+              <div class="metric"><div class="k">People</div><div class="v" id="peopleVal">0</div></div>
+            </div>
             <div class="status" id="status">Idle</div>
             <div class="feed" id="feed"></div>
           </div>
@@ -171,6 +177,9 @@
   </div>
 
   <script type="module">
+    import { mountNavbar, scoreToChip, clamp } from "/static/app.js";
+    mountNavbar();
+
     import { PoseLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/+esm";
     const STORE = "hip_daily_progress_v2";
     const video = document.getElementById("cam");
@@ -187,6 +196,10 @@
     let reps = 0;
     let lastFeed = "";
     let formScore = 90;
+    let accAvg = 0;
+    let accN = 0;
+    let lastRepAt = 0;
+    let dwell = 0;
 
     const POSE_CONNECTIONS = [[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],[23,24],[23,25],[25,27],[24,26],[26,28]];
     const p = (pts, i) => pts[i];
@@ -207,7 +220,7 @@
       return Math.acos(cos) * 180 / Math.PI;
     }
 
-    function pushFeed(msg) {
+    function pushFeed(msg, _kind = "info") {
       if (msg === lastFeed) return;
       lastFeed = msg;
       const t = new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit", second:"2-digit"});
@@ -255,46 +268,97 @@
       const elbow = Number.isFinite(elR) && Number.isFinite(elL) ? (elR + elL) / 2 : NaN;
       const shDiff = Math.abs(p(pts,11).y - p(pts,12).y) * 100;
       const torso = Math.abs(((p(pts,11).x + p(pts,12).x) / 2) - ((p(pts,23).x + p(pts,24).x) / 2)) * 100;
+      const knR = angle(p(pts,26), p(pts,24), p(pts,28));
+      const knL = angle(p(pts,25), p(pts,23), p(pts,27));
+      const knee = Number.isFinite(knR) && Number.isFinite(knL) ? (knR + knL) / 2 : NaN;
 
       document.getElementById("elbowVal").textContent = Number.isFinite(elbow) ? elbow.toFixed(0) + "°" : "--";
       document.getElementById("shoulderVal").textContent = shDiff.toFixed(1);
       document.getElementById("torsoVal").textContent = torso.toFixed(1);
+      document.getElementById("kneeVal").textContent = Number.isFinite(knee) ? knee.toFixed(0) + "°" : "--";
+
+      // Additional angles for squat stability
+      const hipR = angle(p(pts,24), p(pts,26), p(pts,28)); // hip-knee-ankle (proxy)
+      const hipL = angle(p(pts,23), p(pts,25), p(pts,27));
 
       let issues = 0;
       if (shDiff > 2.5) issues += 1;
       if (torso > 5.5) issues += 1;
-      if (Number.isFinite(elbow) && (elbow < 60 || elbow > 170)) issues += 1;
+      if (Number.isFinite(elbow) && (elbow < 60 || elbow > 175)) issues += 1;
+      if (mode === "squat" && Number.isFinite(knee) && (knee < 65 || knee > 175)) issues += 1;
+      if (mode === "squat" && Number.isFinite(hipR) && Number.isFinite(hipL) && Math.abs(hipR - hipL) > 20) issues += 1;
       formScore = Math.max(40, 96 - issues * 16 - Math.max(0, shDiff - 1.5) * 1.7);
       document.getElementById("formScore").textContent = Math.round(formScore);
 
+      // Rep counting: hysteresis + dwell frames + cooldown
+      const nowMs = Date.now();
+      const cooldownOk = (nowMs - lastRepAt) > 650; // prevent double counts
+
       if (mode === "pushup" && Number.isFinite(elbow)) {
-        if (stage === "up" && elbow < 95) {
+        const down = elbow < 98;
+        const up = elbow > 152;
+        dwell = down || up ? (dwell + 1) : 0;
+        if (stage === "up" && down && dwell >= 2) {
           stage = "down";
-          pushFeed("Good depth reached. Drive up with stable core.");
-        } else if (stage === "down" && elbow > 150) {
+          dwell = 0;
+          pushFeed("Depth reached. Drive up—keep core tight.", "warn");
+        } else if (stage === "down" && up && dwell >= 2 && cooldownOk) {
           stage = "up";
+          dwell = 0;
           reps += 1;
+          lastRepAt = nowMs;
           document.getElementById("repCount").textContent = String(reps);
-          pushFeed(`Pushup rep ${reps} counted.`);
-        }
-      }
-      if (mode === "pullup" && Number.isFinite(elbow)) {
-        if (stage === "down" && elbow < 90) {
-          stage = "up";
-          pushFeed("Pull phase reached. Keep shoulders depressed.");
-        } else if (stage === "up" && elbow > 145) {
-          stage = "down";
-          reps += 1;
-          document.getElementById("repCount").textContent = String(reps);
-          pushFeed(`Pullup rep ${reps} counted.`);
+          pushFeed(`Pushup rep ${reps} counted.`, "good");
         }
       }
 
-      const msg = formScore >= 85
-        ? "Form looks good. Continue controlled movement."
-        : formScore >= 70
-          ? "Fair form. Keep shoulders level and core tight."
-          : "Form needs correction. Slow down and align body.";
+      if (mode === "pullup" && Number.isFinite(elbow)) {
+        const top = elbow < 92;
+        const bottom = elbow > 148;
+        dwell = top || bottom ? (dwell + 1) : 0;
+        if (stage === "down" && top && dwell >= 2) {
+          stage = "up";
+          dwell = 0;
+          pushFeed("Top position reached. Control the descent.", "warn");
+        } else if (stage === "up" && bottom && dwell >= 2 && cooldownOk) {
+          stage = "down";
+          dwell = 0;
+          reps += 1;
+          lastRepAt = nowMs;
+          document.getElementById("repCount").textContent = String(reps);
+          pushFeed(`Pullup rep ${reps} counted.`, "good");
+        }
+      }
+
+      if (mode === "squat" && Number.isFinite(knee)) {
+        const down = knee < 118;
+        const up = knee > 162;
+        dwell = down || up ? (dwell + 1) : 0;
+        if (stage === "up" && down && dwell >= 2) {
+          stage = "down";
+          dwell = 0;
+          pushFeed("Squat depth reached. Stand up smoothly.", "warn");
+        } else if (stage === "down" && up && dwell >= 2 && cooldownOk) {
+          stage = "up";
+          dwell = 0;
+          reps += 1;
+          lastRepAt = nowMs;
+          document.getElementById("repCount").textContent = String(reps);
+          pushFeed(`Squat rep ${reps} counted.`, "good");
+        }
+      }
+
+      const acc = clamp(formScore, 0, 100);
+      accAvg = (accAvg * accN + acc) / (accN + 1);
+      accN += 1;
+      document.getElementById("accVal").textContent = `${Math.round(accAvg)}%`;
+
+      const chip = scoreToChip(accAvg);
+      const msg = chip.label === "Correct"
+        ? "Correct form. Keep a steady tempo."
+        : chip.label === "Almost"
+          ? "Almost correct. Reduce speed and stabilize."
+          : "Incorrect form. Reset posture and try again.";
       document.getElementById("status").textContent = msg;
     }
 
@@ -307,7 +371,7 @@
           delegate: "CPU"
         },
         runningMode: "VIDEO",
-        numPoses: 1,
+        numPoses: 4,
         minPoseDetectionConfidence: 0.5,
         minPosePresenceConfidence: 0.5,
         minTrackingConfidence: 0.5
@@ -322,9 +386,11 @@
         await video.play();
         running = true;
         reps = 0;
-        stage = mode === "pushup" ? "up" : "down";
+        stage = mode === "pushup" || mode === "squat" ? "up" : "down";
+        accAvg = 0;
+        accN = 0;
         document.getElementById("repCount").textContent = "0";
-        pushFeed("Camera started. " + (mode === "pushup" ? "Pushup mode active." : "Pullup mode active."));
+        pushFeed("Camera started. " + (mode === "pushup" ? "Pushup mode active." : mode === "pullup" ? "Pullup mode active." : "Squat mode active."));
         requestAnimationFrame(loop);
       } catch (err) {
         document.getElementById("status").textContent = "Camera/model error: " + (err?.message || String(err));
@@ -338,6 +404,8 @@
       video.srcObject = null;
       ctx.clearRect(0,0,canvas.width,canvas.height);
       document.getElementById("status").textContent = "Stopped.";
+      document.getElementById("peopleVal").textContent = "0";
+      document.getElementById("accVal").textContent = "--%";
     }
 
     function loop() {
@@ -348,6 +416,7 @@
         if (video.currentTime !== lastTime) {
           lastTime = video.currentTime;
           const res = pose.detectForVideo(video, now);
+          document.getElementById("peopleVal").textContent = String((res.landmarks || []).length);
           const lm = res.landmarks && res.landmarks[0];
           const pts = draw(lm);
           qualityUpdate(pts);
@@ -419,6 +488,8 @@
       mode = "pushup";
       stage = "up";
       reps = 0;
+      accAvg = 0;
+      accN = 0;
       document.getElementById("curMode").textContent = "Pushup";
       document.getElementById("repCount").textContent = "0";
       pushFeed("Switched to pushup mode.");
@@ -427,9 +498,21 @@
       mode = "pullup";
       stage = "down";
       reps = 0;
+      accAvg = 0;
+      accN = 0;
       document.getElementById("curMode").textContent = "Pullup";
       document.getElementById("repCount").textContent = "0";
       pushFeed("Switched to pullup mode.");
+    });
+    document.getElementById("modeSquatBtn").addEventListener("click", () => {
+      mode = "squat";
+      stage = "up";
+      reps = 0;
+      accAvg = 0;
+      accN = 0;
+      document.getElementById("curMode").textContent = "Squat";
+      document.getElementById("repCount").textContent = "0";
+      pushFeed("Switched to squat mode. Keep full body visible.");
     });
 
     renderCalendar();

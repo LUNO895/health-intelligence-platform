@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Nutrition Planner</title>
+  <link rel="stylesheet" href="/static/app.css" />
   <style>
     :root {
       --bg: #0b1120;
@@ -80,12 +81,44 @@
     .meal-list li { margin-bottom: .18rem; }
     .muted { color: var(--muted); }
     .advice { margin-top: .7rem; border-top: 1px dashed var(--line); padding-top: .6rem; }
+    .actions { display:flex; gap:.5rem; flex-wrap: wrap; margin-top: .6rem; }
+    .btn2 {
+      border: 1px solid var(--line);
+      background: rgba(148,163,184,.12);
+      color: var(--text);
+      border-radius: 10px;
+      padding: .55rem .75rem;
+      font-weight: 650;
+      cursor: pointer;
+    }
+    .btn2:hover { background: rgba(148,163,184,.2); }
+    .week { margin-top: .9rem; }
+    .daycard {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: rgba(2,6,23,.30);
+      padding: .85rem;
+      margin-bottom: .75rem;
+    }
+    .dayhead { display:flex; justify-content:space-between; align-items:center; gap:.6rem; margin-bottom:.45rem; }
+    .dayhead strong { font-size: 1.02rem; }
+    .kcalpill { font-size:.75rem; border:1px solid var(--line); color: var(--muted); border-radius:999px; padding:.12rem .5rem; }
+    .mealsgrid { display:grid; grid-template-columns: repeat(2, 1fr); gap:.55rem; }
+    @media (max-width: 720px) { .mealsgrid { grid-template-columns: 1fr; } }
+    .meal {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: .65rem;
+      background: rgba(2,6,23,.22);
+    }
+    .meal .t { color: var(--muted); font-size: .74rem; text-transform: uppercase; letter-spacing: .08em; }
+    .meal .n { margin-top: .18rem; font-weight: 700; }
+    .meal .m { margin-top: .18rem; color: var(--muted); font-size: .82rem; }
   </style>
 </head>
 <body>
   <div class="wrap">
     <div class="topbar">
-      <a class="back" href="/">← Home</a>
       <span class="muted">User-friendly planner (no code output)</span>
     </div>
     <h1>Nutritional Planner (BMI + Body Fat Based)</h1>
@@ -153,6 +186,11 @@
           </div>
         </div>
         <button type="button" id="planBtn">Generate My Diet Plan</button>
+        <div class="actions">
+          <button class="btn2" type="button" id="weeklyBtn">Generate 7‑Day Plan</button>
+          <button class="btn2" type="button" id="downloadBtn" disabled>Download Plan (JSON)</button>
+          <button class="btn2" type="button" id="downloadCsvBtn" disabled>Download Plan (CSV)</button>
+        </div>
       </section>
 
       <section class="card">
@@ -168,11 +206,18 @@
           <strong id="summaryTxt">Fill your details and click Generate.</strong>
           <ul class="meal-list" id="mealList"></ul>
         </div>
+        <div class="week" id="weekWrap" style="display:none;">
+          <h2 class="title" style="margin-top:1rem;">Weekly Plan (7 Days)</h2>
+          <div id="weekPlan"></div>
+        </div>
       </section>
     </div>
   </div>
 
-  <script>
+  <script type="module">
+    import { mountNavbar } from "/static/app.js";
+    mountNavbar();
+
     const activityFactor = { sedentary:1.2, light:1.375, moderate:1.55, active:1.725, very_active:1.9 };
 
     function bmiCategory(bmi) {
@@ -223,15 +268,90 @@
       return [...common, ...(byDiet[dietType] || [])];
     }
 
-    document.getElementById("planBtn").addEventListener("click", () => {
+    let lastWeekly = null;
+
+    function profilePayload() {
       const age = Number(document.getElementById("age").value || 0);
       const gender = document.getElementById("gender").value;
       const h = Number(document.getElementById("height").value || 0);
       const w = Number(document.getElementById("weight").value || 0);
-      const bf = Number(document.getElementById("bodyFat").value || 0);
       const goal = document.getElementById("goal").value;
       const activity = document.getElementById("activity").value;
       const dietType = document.getElementById("dietType").value;
+      const bf = Number(document.getElementById("bodyFat").value || 0);
+      return { age, gender, h, w, bf, goal, activity, dietType };
+    }
+
+    function toApiProfile(p) {
+      return {
+        age: p.age,
+        gender: p.gender,
+        height_cm: p.h,
+        weight_kg: p.w,
+        activity_level: p.activity,
+        fitness_goal: p.goal,
+        diet_preference: p.dietType,
+        allergies: [],
+      };
+    }
+
+    function downloadText(filename, text, mime) {
+      const blob = new Blob([text], { type: mime || "text/plain" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 2500);
+    }
+
+    function renderWeekly(weeklyPlan) {
+      const wrap = document.getElementById("weekWrap");
+      const out = document.getElementById("weekPlan");
+      const days = (weeklyPlan && weeklyPlan.days) || [];
+      if (!days.length) {
+        wrap.style.display = "none";
+        return;
+      }
+      wrap.style.display = "block";
+      out.innerHTML = days.map((d) => {
+        const totals = d.daily_totals || {};
+        const meals = (d.meals || []).reduce((acc, m) => {
+          acc[m.type] = m;
+          return acc;
+        }, {});
+        const card = (type) => {
+          const m = meals[type];
+          if (!m) return "";
+          return `
+            <div class="meal">
+              <div class="t">${type}</div>
+              <div class="n">${m.name}</div>
+              <div class="m">~${Math.round(m.calories)} kcal · P ${m.protein_g}g · C ${m.carbs_g}g · F ${m.fat_g}g</div>
+            </div>
+          `;
+        };
+        return `
+          <div class="daycard">
+            <div class="dayhead">
+              <strong>Day ${d.day}</strong>
+              <span class="kcalpill">Total ~${Math.round(totals.calories || 0)} kcal</span>
+            </div>
+            <div class="mealsgrid">
+              ${card("breakfast")}
+              ${card("lunch")}
+              ${card("snack")}
+              ${card("dinner")}
+            </div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    document.getElementById("planBtn").addEventListener("click", () => {
+      const p = profilePayload();
+      const age = p.age, gender = p.gender, h = p.h, w = p.w, bf = p.bf, goal = p.goal, activity = p.activity, dietType = p.dietType;
 
       if (!age || !h || !w || !bf) return;
 
@@ -263,6 +383,42 @@
 
       const meals = mealSuggestions(category, goal, dietType, bf);
       document.getElementById("mealList").innerHTML = meals.map((m) => `<li>${m}</li>`).join("");
+    });
+
+    document.getElementById("weeklyBtn").addEventListener("click", async () => {
+      const p = profilePayload();
+      if (!p.age || !p.h || !p.w) return;
+      document.getElementById("summaryTxt").textContent = "Generating weekly plan…";
+      const resp = await fetch("/v1/nutrition/weekly-plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...toApiProfile(p), use_gemini: false }),
+      });
+      const data = await resp.json();
+      lastWeekly = data;
+      document.getElementById("downloadBtn").disabled = false;
+      document.getElementById("downloadCsvBtn").disabled = false;
+      renderWeekly((data.weekly_plan || {}));
+      const am = (data.anthropometrics || {});
+      const bmi = am.bmi;
+      const cat = am.bmi_category || "n/a";
+      document.getElementById("summaryTxt").textContent = `Weekly plan generated. BMI: ${bmi} (${cat}).`;
+    });
+
+    document.getElementById("downloadBtn").addEventListener("click", () => {
+      if (!lastWeekly) return;
+      downloadText("weekly_plan.json", JSON.stringify(lastWeekly, null, 2), "application/json");
+    });
+
+    document.getElementById("downloadCsvBtn").addEventListener("click", async () => {
+      const p = profilePayload();
+      const resp = await fetch("/v1/nutrition/weekly-plan.csv", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...toApiProfile(p), use_gemini: false }),
+      });
+      const csv = await resp.text();
+      downloadText("weekly_plan.csv", csv, "text/csv");
     });
   </script>
 </body>

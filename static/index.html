@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Health Intelligence — Home</title>
+  <link rel="stylesheet" href="/static/app.css" />
   <style>
     :root {
       --bg: #0b1120;
@@ -134,6 +135,16 @@
             <h3>Checklist + Exercise Tracker</h3>
             <p>Track water, 15K steps, pushups, todo list, and live pushup/pullup form check.</p>
           </a>
+          <a class="card" href="/cook-assistant">
+            <span class="badge b2">Cooking AI</span>
+            <h3>Smart Cooking Assistant</h3>
+            <p>Type ingredients and get recipe suggestions + interactive Cook Mode with voice steps.</p>
+          </a>
+          <a class="card" href="/yoga-mode">
+            <span class="badge b1">Yoga Mode</span>
+            <h3>Yoga Guidance</h3>
+            <p>Select a yoga pose level and get real-time accuracy and corrections.</p>
+          </a>
         </div>
         <p class="muted" style="margin-top:.9rem;">
           Do not open HTML as <code>file://</code>; use <code>http://127.0.0.1:8000/</code>.
@@ -156,7 +167,10 @@
     </div>
   </div>
 
-  <script>
+  <script type="module">
+    import { mountNavbar } from "/static/app.js";
+    mountNavbar();
+
     const STORAGE_KEY = "hip_streak_dates_v1";
     const calendarEl = document.getElementById("calendar");
     const streakEl = document.getElementById("streakCount");

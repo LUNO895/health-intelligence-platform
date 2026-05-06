@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Smart Cooking Assistant</title>
+  <link rel="stylesheet" href="/static/app.css" />
+  <style>
+    :root {
+      --bg: #0b1120;
+      --card: rgba(15,23,42,.86);
+      --line: rgba(148,163,184,.25);
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --blue: #60a5fa;
+      --green: #22c55e;
+      --amber: #f59e0b;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      background:
+        radial-gradient(900px 420px at -10% -10%, rgba(59,130,246,.22), transparent 55%),
+        radial-gradient(760px 340px at 110% 0%, rgba(34,197,94,.16), transparent 50%),
+        var(--bg);
+      min-height: 100vh;
+    }
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 1rem; }
+    .top { display:flex; justify-content:space-between; align-items:center; gap:1rem; margin-bottom: .8rem; }
+    a.back { color:#93c5fd; text-decoration:none; }
+    h1 { margin: 0.1rem 0 0; font-size: clamp(1.25rem, 2.7vw, 1.75rem); }
+    .grid { display:grid; grid-template-columns: 1fr 1.1fr; gap: 1rem; }
+    @media (max-width: 940px) { .grid { grid-template-columns: 1fr; } }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 1rem;
+      backdrop-filter: blur(6px);
+    }
+    .title { margin: 0 0 .7rem; color: var(--muted); text-transform: uppercase; letter-spacing:.08em; font-size:.9rem; }
+    textarea {
+      width: 100%;
+      min-height: 110px;
+      background: rgba(2,6,23,.45);
+      border: 1px solid var(--line);
+      color: var(--text);
+      border-radius: 12px;
+      padding: .7rem;
+      resize: vertical;
+      line-height: 1.5;
+    }
+    button {
+      margin-top: .7rem;
+      border: 1px solid rgba(96,165,250,.45);
+      background: rgba(59,130,246,.2);
+      color: #dbeafe;
+      border-radius: 10px;
+      padding: .58rem .82rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    button:hover { background: rgba(59,130,246,.3); }
+    .pill { display:inline-block; border:1px solid var(--line); border-radius:999px; padding:.12rem .45rem; font-size:.72rem; color: var(--muted); }
+    .recipe {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: .85rem;
+      background: rgba(2,6,23,.32);
+      margin-bottom: .7rem;
+    }
+    .recipe h3 { margin: 0 0 .25rem; font-size: 1.06rem; }
+    .recipe .muted { color: var(--muted); font-size: .86rem; margin-bottom: .55rem; }
+    .steps { margin: .2rem 0 0; padding-left: 1.2rem; line-height: 1.6; }
+    .cookbar { display:flex; gap:.5rem; flex-wrap: wrap; align-items:center; margin-top: .6rem; }
+    .stepbox {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: .85rem;
+      background: rgba(2,6,23,.32);
+      min-height: 120px;
+    }
+    .stepnum { color: var(--muted); font-size: .8rem; }
+    .steptext { margin-top: .35rem; font-size: 1.02rem; line-height: 1.5; }
+    .btn2 {
+      border: 1px solid var(--line);
+      background: rgba(148,163,184,.12);
+      color: var(--text);
+      border-radius: 10px;
+      padding: .48rem .72rem;
+      font-weight: 650;
+    }
+    .btn2:hover { background: rgba(148,163,184,.2); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <span class="pill">Smart Cooking Assistant</span>
+    </div>
+    <h1>Ingredients → Recipe Suggestions + Cook Mode</h1>
+
+    <div class="grid">
+      <section class="card">
+        <h2 class="title">Input Ingredients</h2>
+        <p style="margin:0 0 .6rem; color:var(--muted);">Enter items separated by commas (example: rice, egg, tomato, onion).</p>
+        <textarea id="ingredients">rice, egg, tomato, onion</textarea>
+        <button id="btnSuggest" type="button">Suggest Recipes</button>
+        <div id="note" style="margin-top:.7rem; color:var(--muted);"></div>
+      </section>
+
+      <section class="card">
+        <h2 class="title">Best Dish + Cook Mode</h2>
+        <div id="best"></div>
+        <div id="cookMode" style="display:none;">
+          <div class="cookbar">
+            <button class="btn2" id="prevStep" type="button">← Previous</button>
+            <button class="btn2" id="nextStep" type="button">Next →</button>
+            <button class="btn2" id="speakStep" type="button">Read step</button>
+            <span class="pill" id="stepPill">Step 1</span>
+          </div>
+          <div class="stepbox" style="margin-top:.6rem;">
+            <div class="stepnum" id="stepNum"></div>
+            <div class="steptext" id="stepText"></div>
+          </div>
+        </div>
+
+        <h2 class="title" style="margin-top:1rem;">Other Suggestions</h2>
+        <div id="others"></div>
+      </section>
+    </div>
+  </div>
+
+  <script type="module">
+    import { mountNavbar } from "/static/app.js";
+    mountNavbar();
+
+    const bestEl = document.getElementById("best");
+    const othersEl = document.getElementById("others");
+    const noteEl = document.getElementById("note");
+    const cookModeEl = document.getElementById("cookMode");
+    const stepNumEl = document.getElementById("stepNum");
+    const stepTextEl = document.getElementById("stepText");
+    const stepPillEl = document.getElementById("stepPill");
+    let cookSteps = [];
+    let cookIdx = 0;
+
+    function renderCook() {
+      if (!cookSteps.length) return;
+      cookIdx = Math.max(0, Math.min(cookSteps.length - 1, cookIdx));
+      stepNumEl.textContent = `Step ${cookIdx + 1} of ${cookSteps.length}`;
+      stepPillEl.textContent = `Step ${cookIdx + 1}`;
+      stepTextEl.textContent = cookSteps[cookIdx];
+    }
+
+    function speak(text) {
+      if (!("speechSynthesis" in window)) return;
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.rate = 1.0;
+      u.pitch = 1.0;
+      window.speechSynthesis.speak(u);
+    }
+
+    function recipeCard(r, isBest=false) {
+      const used = (r.ingredients_used || []).join(", ");
+      const steps = (r.steps || []).map((s) => `<li>${s}</li>`).join("");
+      return `
+        <div class="recipe">
+          <h3>${isBest ? "⭐ " : ""}${r.name}</h3>
+          <div class="muted"><strong>Ingredients used:</strong> ${used}</div>
+          <ol class="steps">${steps}</ol>
+        </div>
+      `;
+    }
+
+    async function suggest() {
+      bestEl.innerHTML = "";
+      othersEl.innerHTML = "";
+      noteEl.textContent = "Thinking…";
+      cookModeEl.style.display = "none";
+      cookSteps = [];
+      cookIdx = 0;
+
+      const ingredients = document.getElementById("ingredients").value || "";
+      const resp = await fetch("/v1/cook/suggest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ingredients, limit: 6 }),
+      });
+      const data = await resp.json();
+      noteEl.textContent = data.note || "";
+
+      if (data.best) {
+        bestEl.innerHTML = recipeCard(data.best, true);
+        cookSteps = data.best.steps || [];
+        if (cookSteps.length) {
+          cookModeEl.style.display = "block";
+          renderCook();
+        }
+      } else {
+        bestEl.innerHTML = `<div class="muted">No strong match yet. Add more ingredients.</div>`;
+      }
+      const others = (data.recipes || []).slice(1);
+      othersEl.innerHTML = others.map((r) => recipeCard(r)).join("") || `<div class="muted">No other recipes.</div>`;
+    }
+
+    document.getElementById("btnSuggest").addEventListener("click", suggest);
+    document.getElementById("prevStep").addEventListener("click", () => { cookIdx -= 1; renderCook(); });
+    document.getElementById("nextStep").addEventListener("click", () => { cookIdx += 1; renderCook(); });
+    document.getElementById("speakStep").addEventListener("click", () => { if (cookSteps.length) speak(cookSteps[cookIdx]); });
+  </script>
+</body>
+</html>
+

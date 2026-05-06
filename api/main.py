@@ -11,8 +11,9 @@ from typing import Any, Dict, Optional
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from pydantic import BaseModel, Field
+from fastapi.staticfiles import StaticFiles
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -29,6 +30,7 @@ from nutrition_module.schemas import UserHealthProfile  # noqa: E402
 from pose_module.video_analyzer import analyze_video_file, report_to_dict  # noqa: E402
 from video_module.script_generator import build_explainer_script  # noqa: E402
 from video_module.video_creator import render_health_video  # noqa: E402
+from cooking_module.recipes import suggest_recipes  # noqa: E402
 
 OUTPUT = ROOT / "output"
 OUTPUT.mkdir(parents=True, exist_ok=True)
@@ -61,6 +63,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Serve shared CSS/JS assets
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 
 @app.get("/")
@@ -97,6 +102,22 @@ def daily_progress_page() -> FileResponse:
     return FileResponse(path, media_type="text/html")
 
 
+@app.get("/cook-assistant")
+def cook_assistant_page() -> FileResponse:
+    path = STATIC_DIR / "cook_assistant.html"
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="static/cook_assistant.html missing")
+    return FileResponse(path, media_type="text/html")
+
+
+@app.get("/yoga-mode")
+def yoga_mode_page() -> FileResponse:
+    path = STATIC_DIR / "yoga_mode.html"
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="static/yoga_mode.html missing")
+    return FileResponse(path, media_type="text/html")
+
+
 @app.get("/health")
 def health() -> Dict[str, Any]:
     return {
@@ -117,6 +138,54 @@ def nutrition_metrics_and_plan(req: NutritionOnlyRequest) -> Dict[str, Any]:
         "meal_plan": plan.to_dict(),
     }
 
+
+@app.post("/v1/nutrition/weekly-plan")
+def nutrition_weekly_plan(req: NutritionOnlyRequest) -> Dict[str, Any]:
+    """
+    Returns a 7-day plan with breakfast/lunch/snack/dinner.
+    Intended for the Nutrition Planner UI.
+    """
+    profile = UserHealthProfile.model_validate(req.model_dump(exclude={"use_gemini"}))
+    metrics = compute_nutrition_metrics(profile)
+    plan = build_weekly_plan(profile, metrics)
+    return {
+        "anthropometrics": metrics_to_dict(metrics),
+        "weekly_plan": plan.to_dict(),
+    }
+
+
+@app.post("/v1/nutrition/weekly-plan.csv", response_class=PlainTextResponse)
+def nutrition_weekly_plan_csv(req: NutritionOnlyRequest) -> str:
+    profile = UserHealthProfile.model_validate(req.model_dump(exclude={"use_gemini"}))
+    metrics = compute_nutrition_metrics(profile)
+    plan = build_weekly_plan(profile, metrics).to_dict()
+    # Simple CSV
+    lines = ["day,meal_type,name,calories,protein_g,carbs_g,fat_g"]
+    for d in plan.get("days", []):
+        day = d.get("day")
+        for m in d.get("meals", []):
+            lines.append(
+                f'{day},{m.get("type")},{_csv_safe(m.get("name"))},{m.get("calories")},{m.get("protein_g")},{m.get("carbs_g")},{m.get("fat_g")}'
+            )
+    return "\n".join(lines)
+
+
+def _csv_safe(v: Any) -> str:
+    s = str(v or "").replace('"', '""')
+    if "," in s or "\n" in s:
+        return f'"{s}"'
+    return s
+
+
+@app.post("/v1/cook/suggest")
+def cook_suggest(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Input JSON:
+      { "ingredients": "rice, egg, tomato", "limit": 5 }
+    """
+    ingredients = payload.get("ingredients", "")
+    limit = int(payload.get("limit", 5) or 5)
+    return suggest_recipes(ingredients, limit=limit)
 
 @app.post("/v1/pose/analyze-video")
 async def pose_analyze_video(
